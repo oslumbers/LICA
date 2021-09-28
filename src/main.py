@@ -1,15 +1,16 @@
 import numpy as np
 import os
-import collections
+from collections.abc import Mapping
 from os.path import dirname, abspath
 from copy import deepcopy
 from sacred import Experiment, SETTINGS
 from sacred.observers import FileStorageObserver
 from sacred.utils import apply_backspaces_and_linefeeds
 import sys
-import torch as th
+import torch 
 from utils.logging import get_logger
 import yaml
+import datetime
 
 from run import run
 
@@ -22,13 +23,12 @@ ex.captured_out_filter = apply_backspaces_and_linefeeds
 
 results_path = os.path.join(dirname(dirname(abspath(__file__))), "results")
 
-
 @ex.main
-def my_main(_run, _config, _log):
+def my_main(_run, _config, _log, env_args):
     # Setting the random seed throughout the modules
     config = config_copy(_config)
     np.random.seed(config["seed"])
-    th.manual_seed(config["seed"])
+    torch.manual_seed(config["seed"])
     config['env_args']['seed'] = config["seed"]
 
     # run the framework
@@ -54,12 +54,11 @@ def _get_config(params, arg_name, subfolder):
 
 def recursive_dict_update(d, u):
     for k, v in u.items():
-        if isinstance(v, collections.Mapping):
+        if isinstance(v, Mapping):
             d[k] = recursive_dict_update(d.get(k, {}), v)
         else:
             d[k] = v
     return d
-
 
 def config_copy(config):
     if isinstance(config, dict):
@@ -83,16 +82,24 @@ if __name__ == '__main__':
     # Load algorithm and env base configs
     env_config = _get_config(params, "--env-config", "envs")
     alg_config = _get_config(params, "--config", "algs")
-    # config_dict = {**config_dict, **env_config, **alg_config}
     config_dict = recursive_dict_update(config_dict, env_config)
     config_dict = recursive_dict_update(config_dict, alg_config)
+    
+    # specify the map for experiment
 
+    map_name = config_dict['env_args']['key'] 
+        
     # now add all the config to sacred
     ex.add_config(config_dict)
 
+    for param in params:
+        if param.startswith("env_args.key"):
+            map_name = param.split("=")[1]
+
     # Save to disk by default for sacred
-    logger.info("Saving to FileStorageObserver in results/sacred.")
-    file_obs_path = os.path.join(results_path, "sacred")
+    unique_token = "{}_{}_{}".format(config_dict['name'], map_name, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    logger.info("Saving to FileStorageObserver in results/sacred/{}/.".format(unique_token))
+    file_obs_path = os.path.join(results_path, "sacred", unique_token)
     ex.observers.append(FileStorageObserver.create(file_obs_path))
 
     ex.run_commandline(params)
