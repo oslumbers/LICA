@@ -34,7 +34,9 @@ class ParallelRunner:
         self.t_env = 0
 
         self.train_returns = []
+        self.train_avg_reward = []
         self.test_returns = []
+        self.test_avg_reward = []
         self.train_stats = {}
         self.test_stats = {}
 
@@ -87,6 +89,7 @@ class ParallelRunner:
 
         all_terminated = False
         episode_returns = [0 for _ in range(self.batch_size)]
+        episode_avg_rewards = [0 for _ in range(self.batch_size)]
         episode_lengths = [0 for _ in range(self.batch_size)]
         self.mac.init_hidden(batch_size=self.batch_size)
         terminated = [False for _ in range(self.batch_size)]
@@ -156,6 +159,7 @@ class ParallelRunner:
                     pre_transition_data["state"].append(data["state"])
                     pre_transition_data["avail_actions"].append(data["avail_actions"])
                     pre_transition_data["obs"].append(data["obs"])
+                episode_avg_rewards[idx] = episode_returns[idx] / episode_lengths[idx]
 
             # Add post_transiton data into the batch
             self.batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
@@ -180,6 +184,7 @@ class ParallelRunner:
 
         cur_stats = self.test_stats if test_mode else self.train_stats
         cur_returns = self.test_returns if test_mode else self.train_returns
+        cur_avg_rewards = self.test_avg_reward if test_mode else self.train_avg_reward
         log_prefix = "test_" if test_mode else ""
         infos = [cur_stats] + final_env_infos
         cur_stats.update({k: sum(d.get(k, 0) for d in infos) for k in set.union(*[set(d) for d in infos])})
@@ -187,6 +192,7 @@ class ParallelRunner:
         cur_stats["ep_length"] = sum(episode_lengths) + cur_stats.get("ep_length", 0)
 
         cur_returns.extend(episode_returns)
+        cur_avg_rewards.extend(episode_avg_rewards)
 
         n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
         if test_mode and (len(self.test_returns) == n_test_runs):
