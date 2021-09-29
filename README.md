@@ -24,10 +24,10 @@ bash install_sc2.sh
 
 ## Training
 
-To train `LICA` on the `5m_vs_6m` scenario,
+To train `LICA` on the `LBF` scenario,
 
 ```shell
-python3 src/main.py --config=lica --env-config=sc2 with env_args.map_name=5m_vs_6m
+python3 main.py --config=lica --env-config=gymma with env_args.time_limit=100 env_args.key='LBF'
 ```
 
 Change the `map_name` accordingly for other scenarios (e.g. `mmm2`). Remember to update hyperparameters accordingly (e.g. regularization coefficient). All results will be saved in the `results` folder.
